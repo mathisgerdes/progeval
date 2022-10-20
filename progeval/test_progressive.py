@@ -214,6 +214,20 @@ class TestProgEval(unittest.TestCase):
         self.assertEqual(
             registered, {('alpha', True), ('beta', True), ('gamma', True)})
 
+    def test_dynamic_reassign(self):
+        graph = ProgEval()
+        graph.alpha = lambda x: 2 * x + 1
+        graph.beta = lambda y: y * y
+        graph.gamma = lambda alpha, beta, y: alpha * beta - y
+
+        # first run
+        graph.x, graph.y = 3, 8
+        self.assertEqual(graph.gamma, 440)
+
+        # second run
+        graph.x, graph.y = 3, 4
+        self.assertEqual(graph.gamma, 108)
+
 
 if __name__ == '__main__':
     unittest.main()

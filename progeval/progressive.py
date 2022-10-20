@@ -89,7 +89,7 @@ def _identity(name, val):
 
 
 class ProgEval(metaclass=ProgEvalMeta):
-    _track_dependence: bool = None
+    _track_dependence: bool = True
     # mustn't change signature
     _transformer: Callable[[Callable, bool, str],
                            Union[Callable, tuple[Callable, Signature]]] = None
@@ -113,6 +113,11 @@ class ProgEval(metaclass=ProgEvalMeta):
 
     def register(self, name, function: Union[Callable, Any],
                  args: Sequence[str] = None):
+        try:
+            delattr(self, name)  # this will recursively reset dependents
+        except AttributeError:
+            pass  # wasn't a registered quantity
+
         if not callable(function):
             self._store[name] = function
             function = _identity(name, function)
@@ -141,28 +146,31 @@ class ProgEval(metaclass=ProgEvalMeta):
         if key in self.__dict__:
             raise RuntimeError(f'overriding attribute {key} is not supported')
 
-        if callable(value):
-            try:
-                del self._store[key]
-            except KeyError:
-                pass  # doesn't matter if it existed or not
-            self.register(key, value)
-            return
+        is_quantity = not callable(value)
 
         try:  # try to set value of class-level property
             obj = type(self).__dict__[key]
+        except KeyError:
+            pass  # handled below
+        else:
             if not isinstance(obj, property):
                 raise RuntimeError(
                     f'overriding attribute {key} is not supported')
-            print('setting parent property value')
-            obj.fset(self, value)
-        except KeyError:
+            if is_quantity:
+                obj.fset(self, value)
+                return
+
+        if is_quantity:
             try:  # try to set value of dynamically added property
                 self._dynamic_nodes[key].fset(self, value)
+                return
             except KeyError:
-                # create a new node in the computational graph
                 self._store[key] = value
-                self.register(key, _identity(key, value))
+                # need to create a new (dummy) node
+                value = _identity(key, value)
+
+        # set dynamic node (precedence over statically defined properties)
+        self.register(key, value)
 
     def __delattr__(self, key):
         try:  # try to delete value of (class-level) property
@@ -175,6 +183,7 @@ class ProgEval(metaclass=ProgEvalMeta):
 
         try:  # try to delete value of dynamically added property
             self._dynamic_nodes[key].fdel(self)
+            return
         except KeyError:
             pass
 
