@@ -4,6 +4,8 @@ from inspect import signature, Signature
 from typing import Callable, Union, Optional, Any, Sequence
 from collections import defaultdict
 
+__version__ = '1.0.0'
+
 
 def _make_property(name, fun, static, transformer, args=None) -> property:
     """Create a property object from a generator function."""
@@ -113,10 +115,11 @@ class ProgEval(metaclass=ProgEvalMeta):
 
     def register(self, name, function: Union[Callable, Any],
                  args: Sequence[str] = None):
-        try:
-            delattr(self, name)  # this will recursively reset dependents
-        except AttributeError:
-            pass  # wasn't a registered quantity
+        if self._track_dependence:
+            try:
+                delattr(self, name)  # this will recursively reset dependents
+            except AttributeError:
+                pass  # wasn't a registered quantity
 
         if not callable(function):
             self._store[name] = function
@@ -192,3 +195,6 @@ class ProgEval(metaclass=ProgEvalMeta):
             return
         except KeyError:
             raise AttributeError(f'{key} is not a registered quantity')
+
+
+__all__ = ['ProgEval']

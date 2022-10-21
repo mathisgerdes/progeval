@@ -1,6 +1,9 @@
 [![Tests](https://github.com/mathisgerdes/progeval/actions/workflows/python-test.yml/badge.svg)](https://github.com/mathisgerdes/progeval/actions/workflows/python-test.yml)
 # Progressive evaluation
 
+[**Documentation**](https://progeval.readthedocs.io/)
+| [**Examples**](#examples)
+
 This package lets the user define a computation such that:
 1. Depending on the requested output, only the required (partial) computations are executed.
 2. Intermediate quantities can be overriden by the user such that dependent values are recomputed.
@@ -29,7 +32,6 @@ graph.total = lambda alpha, beta: alpha + beta
 # we can then set inputs ...
 graph.x, graph.y = 3, 6
 # ... and evaluate any (intermediate) value
-graph.beta == 9
 graph.total == 27
 ```
 
@@ -51,7 +53,6 @@ graph.register('beta', add)
 # here the inputs we want are different from the names 
 # in the function definition of `add`
 graph.register('total', add, ['alpha', 'beta'])
-# then set x, y, get outputs etc.
 ```
 
 Another way to define the computational graph is by collecting all parts of the computation as methods of a class:
@@ -59,24 +60,30 @@ Another way to define the computational graph is by collecting all parts of the 
 ```python
 from progeval import ProgEval
 
+
 class Computation(ProgEval):
+
     def __init__(self, x, y):
         super().__init__(x=x, y=y)
-        
+
     @staticmethod
     def alpha(x, y):
         return x * y
-    
+
     @staticmethod
     def beta(x, y):
         return x + y
-    
+
     @staticmethod
     def total(alpha, beta):
         return alpha + beta
 
 # The class then acts almost like a normal function
-outputs = Computation(3, 8)
-# where the outputs are accessible as attributes
-outputs.total == 35
+Computation(3, 8).total == 35
 ```
+
+## Related
+A similar functionality of delayed evaluation of a computational graph is provided by [Dask delayed](https://docs.dask.org/en/stable/delayed.html).
+However, the construction is slightly different.
+There, the graph is built dynamically by replacing intermediate quantities with `Delayed` objects and wrapping functions.
+The functionality of `Dask`, which is intended for computational parallelism, can even be combined with the structures here, as shown in the how-to section of the documentation.
