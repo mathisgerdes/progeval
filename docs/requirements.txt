@@ -8,4 +8,5 @@ sphinx-copybutton
 
 # Packages used for notebook execution
 jax
+jaxlib
 dask

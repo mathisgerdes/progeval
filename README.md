@@ -1,4 +1,6 @@
 [![Tests](https://github.com/mathisgerdes/progeval/actions/workflows/python-test.yml/badge.svg)](https://github.com/mathisgerdes/progeval/actions/workflows/python-test.yml)
+[![Documentation Status](https://readthedocs.org/projects/progeval/badge/?version=latest)](https://progeval.readthedocs.io/en/latest/?badge=latest)
+
 # Progressive evaluation
 
 [**Documentation**](https://progeval.readthedocs.io/)
