@@ -2,13 +2,23 @@
 # Progressive evaluation
 
 [**Documentation**](https://progeval.readthedocs.io/)
+| [**Installation**](#installation)
 | [**Examples**](#examples)
+| [**Related**](#related)
 
 This package lets the user define a computation such that:
 1. Depending on the requested output, only the required (partial) computations are executed.
 2. Intermediate quantities can be overriden by the user such that dependent values are recomputed.
 
 The computational graph can either be defined as a class, or is constructed dynamically by registering nodes.
+
+## Installation
+
+To use progeval, it can be installed with pip:
+
+```bash
+(.venv) $ pip install progeval
+```
 
 ## Examples
 Consider the following toy computation:

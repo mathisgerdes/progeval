@@ -50,7 +50,7 @@ def _make_property(name, fun, static, transformer, args=None) -> property:
             setter(self, val)
             return val
 
-    return property(getter, setter, delete, fun.__doc__)
+    return property(getter, setter, delete, getattr(fun, '__doc__', None))
 
 
 class ProgEvalMeta(type):
@@ -103,6 +103,39 @@ class ProgEval(metaclass=ProgEvalMeta):
                 [Callable, bool, str],
                 Union[Callable, tuple[Callable, Signature]]] = None,
             **initial_values):
+        """This class implements a cached computational graph.
+
+        Nodes of the computational graph are only evaluated if they
+        are requested and values are cached to avoid re-computation.
+        If the graph is changed (by re-assigning nodes), only parts
+        that depend on the change are re-evaluated.
+
+        Computational graphs can be created in two ways:
+
+        - Dynamically, by assigning nodes to a ``ProgEval()`` object.
+          Assignments can be made either as e.g. ``graph.x = lambda a: 2*a``,
+          or by invoking ``graph.register(name, function)``.
+        - Statically, by subclassing ProgEval. All class methods that do not
+          start with an underscore are interpreted as computational nodes.
+
+        The two methods can also be mixed.
+
+        Args:
+            track_dependence: Whether to track dependence in the graph.
+                The default is true. If set to false, changing the
+                computational graph will not force dependent values to
+                be re-computed.
+            transformer: Can be used to transform every computational node
+                in the graph. The function must take the function, whether
+                it is static, and the name as inputs. Static indicates
+                whether the first argument of the function is `self`,
+                i.e. an instance of the computational graph.
+                The output must be a function with the same call signature,
+                or a tuple of the modified function and the new call signature.
+            **initial_values: Input values can be set in a convenient way
+                by passing them as arguments here. This is equivalent to
+                setting them afterwards via e.g. ``self.x = x``.
+        """
         self.__dict__['_store'] = {}
         self.__dict__['_dynamic_nodes'] = {}
         self.__dict__['_dependencies'] = defaultdict(list)
@@ -114,7 +147,23 @@ class ProgEval(metaclass=ProgEvalMeta):
             setattr(self, key, value)
 
     def register(self, name, function: Union[Callable, Any],
-                 args: Sequence[str] = None):
+                 args: Sequence[str] = None) -> None:
+        """Add a new node to the computational graph.
+
+        The given function specifies how to compute the quantity with
+        the given name. If the second argument is not callable, it is
+        instead interpreted as the value of the quantity.
+
+        If the third argument is given, it specifies the quantities
+        that must be computed first and passed to the function.
+        Otherwise, this is automatically derived from the argument names
+        of the function.
+
+        Args:
+            name: Name of node/quantity in computational graph.
+            function: Specifies how to compute the quantity or is its value.
+            args: Overrides the argument names of the function.
+        """
         if self._track_dependence:
             try:
                 delattr(self, name)  # this will recursively reset dependents
@@ -127,7 +176,12 @@ class ProgEval(metaclass=ProgEvalMeta):
         prop = _make_property(name, function, True, self._transformer, args)
         self._dynamic_nodes[name] = prop
 
-    def compute_all_quantities(self):
+    def compute_all_quantities(self) -> dict[str, Any]:
+        """Evaluate all quantities in the computational graph.
+
+        Returns:
+            A dictionary mapping the name of the quantity to its value.
+        """
         outputs = {}
         for name, obj in type(self).__dict__.items():
             if isinstance(obj, property):
@@ -138,7 +192,31 @@ class ProgEval(metaclass=ProgEvalMeta):
 
         return outputs
 
+    def clear_cache(self):
+        """Remove all cached values of the computational graph."""
+        for prop in self._dynamic_nodes.values():
+            prop.fdel(self)
+
+        for prop in type(self).__dict__.values():
+            if isinstance(prop, property):
+                prop.fdel(self)
+
     def __getattr__(self, key):
+        """Get attribute of computational graph.
+
+        This is only invoked if looking up class attributes and
+        elements in self.__dict__ failed. Thus, only need to check
+        whether ``key`` is a dynamically registered node.
+        """
+        if key in type(self).__dict__:
+            # This can only happen if the evaluation of the function
+            # set by the user raises an AttributeError. Python then
+            # tries to call __getattr__, assuming that `key` doesn't exist.
+            # But really, the AttributeError should be raised. Otherwise,
+            # the true underlying error is obscured by and it would appear
+            # the node isn't registered.
+            return type(self).__dict__[key].fget(self)
+
         try:
             val = self._dynamic_nodes[key]
         except KeyError:
@@ -146,6 +224,12 @@ class ProgEval(metaclass=ProgEvalMeta):
         return val.fget(self)
 
     def __setattr__(self, key, value):
+        """Set attribute of computational graph.
+
+        Arguments in self.__dict__ must not be overridden as they ensure
+        the computational graph behaves as expected. All supported assignments
+        must either set the value of an existing node or create a new node.
+        """
         if key in self.__dict__:
             raise RuntimeError(f'overriding attribute {key} is not supported')
 
@@ -176,6 +260,11 @@ class ProgEval(metaclass=ProgEvalMeta):
         self.register(key, value)
 
     def __delattr__(self, key):
+        """Delete cached value of nodes in computational graph.
+
+        The computational structure of the graph is kept, only the values
+        that were computed previously are deleted.
+        """
         try:  # try to delete value of (class-level) property
             obj = type(self).__dict__[key]
             if isinstance(obj, property):
@@ -188,13 +277,10 @@ class ProgEval(metaclass=ProgEvalMeta):
             self._dynamic_nodes[key].fdel(self)
             return
         except KeyError:
-            pass
-
-        try:  # try to delete instance object
-            del self.__dict__[key]
-            return
-        except KeyError:
             raise AttributeError(f'{key} is not a registered quantity')
+
+        # Do not support deleting values from self.__dict__ as assignment
+        # is also not supported.
 
 
 __all__ = ['ProgEval']
