@@ -35,15 +35,25 @@ myst_heading_anchors = 3
 
 # -- Options for HTML output
 
-html_theme = 'sphinx_book_theme'
+html_theme = 'pydata_sphinx_theme'
 html_title = "Progressive Evaluation"
 html_favicon = '_static/favicon.ico'
 
 html_theme_options = {
-    'repository_url': 'https://github.com/mathisgerdes/progeval',
-    'use_repository_button': True,
     'use_edit_page_button': False,
     'show_toc_level': 2,
+    'github_url': 'https://github.com/mathisgerdes/progeval',
+    'icon_links': [
+            {
+                'name': 'PyPI',
+                'url': 'https://pypi.org/project/progeval/',
+                'icon': 'fa-solid fa-box',
+            },
+        ],
+}
+
+html_sidebars = {
+  "**": []
 }
 
 # myst options
